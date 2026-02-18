@@ -1,0 +1,12 @@
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.so
+*.exe
+bin/
+
+.vscode
+.idea/
+*.swp

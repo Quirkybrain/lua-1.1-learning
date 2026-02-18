@@ -11,14 +11,19 @@ char *rcs_iolib="$Id: iolib.c,v 1.4 1994/04/25 20:11:23 celes Exp $";
 #include <ctype.h>
 #include <sys/stat.h>
 #ifdef __GNUC__
-#include <floatingpoint.h>
+// 现代系统已经不需要这个库
+// #include <floatingpoint.h>
 #endif
 
 #include "mm.h"
 
 #include "lua.h"
 
-static FILE *in=stdin, *out=stdout;
+// 现代gcc不允许将宏作为static变量初始化值
+// 查看iolib.c文件发现在iolib_open函数是调用其他函数的入口
+// 采取先创建指针in, out再在iolib_open中进行赋值
+// static FILE *in=stdin, *out=stdout;
+static FILE *in, *out;
 
 /*
 ** Open a file to read.
@@ -469,6 +474,8 @@ void io_remove  (void)
 */
 void iolib_open (void)
 {
+ in = stdin;
+ out = stdout;
  lua_register ("readfrom", io_readfrom);
  lua_register ("writeto",  io_writeto);
  lua_register ("appendto", io_appendto);

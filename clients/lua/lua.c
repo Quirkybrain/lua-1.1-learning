@@ -10,7 +10,9 @@ char *rcs_lua="$Id: lua.c,v 1.1 1993/12/17 18:41:19 celes Exp $";
 #include "lua.h"
 #include "lualib.h"
 
-void main (int argc, char *argv[])
+// 现代C语言main的返回值使用int而不是void
+
+int main (int argc, char *argv[])
 {
  int i;
  iolib_open ();
@@ -25,4 +27,6 @@ void main (int argc, char *argv[])
  else
    for (i=1; i<argc; i++)
     lua_dofile (argv[i]);
+
+ return 0;
 }
