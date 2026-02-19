@@ -1,3 +1,7 @@
+/**
+ * @file y.tab.c
+ * @brief 由 Yacc 生成的语法分析器：将 token 序列解析为语法结构，并生成字节码。
+ */
 
 # line 2 "lua.stx"
 

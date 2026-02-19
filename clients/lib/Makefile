@@ -7,7 +7,7 @@ LIB= ../../lib
 
 CC= gcc
 # CFLAGS= -Wall -O2 -I$(INC) $(DEFS)
-CFLAGS= -Wall -O2 -fPIC -I$(INC) $(DEFS)
+CFLAGS= -g -Wall -O2 -fPIC -I$(INC) $(DEFS)
 
 OBJS= iolib.o mathlib.o strlib.o
 SLIB= $(LIB)/liblualib.a

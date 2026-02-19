@@ -1,11 +1,11 @@
 # makefile for lua hierarchy
 
 all:
-	(cd src; make)
-	(cd clients/lib; make)
-	(cd clients/lua; make)
+	$(MAKE) -C src
+	$(MAKE) -C clients/lib
+	$(MAKE) -C clients/lua
 
 clean:
-	(cd src; make clean)
-	(cd clients/lib; make clean)
-	(cd clients/lua; make clean)
+	$(MAKE) -C src clean
+	$(MAKE) -C clients/lib clean
+	$(MAKE) -C clients/lua clean

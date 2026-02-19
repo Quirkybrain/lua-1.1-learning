@@ -1,7 +1,7 @@
-/*
-** opcode.c
-** TecCGraf - PUC-Rio
-*/
+/**
+ * @fiel opcode.c
+ * @brief 虚拟机核心，执行字节码指令（lua_execute），实现栈操作、算术运算、跳转、函数调用等，提供 API 函数的实现。
+ */
 
 char *rcs_opcode="$Id: opcode.c,v 2.1 1994/04/20 22:07:57 celes Exp $";
 

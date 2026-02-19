@@ -1,8 +1,7 @@
-/*
-** inout.c
-** Provide function to realise the input/output function and debugger 
-** facilities.
-*/
+/**
+ * @file inout.c
+ * @brief 输入/输出辅助，处理文件/字符串的打开关闭、错误报告、调试信息记录。
+ */
 
 char *rcs_inout="$Id: inout.c,v 1.2 1993/12/22 21:15:16 roberto Exp $";
 

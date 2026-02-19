@@ -1,8 +1,7 @@
-/*
-** table.c
-** Module to control static tables
-*/
-
+/**
+ * @file table.c
+ * @brief 管理符号表（全局变量）、常量表、字符串表，实现字符串驻留和垃圾收集。
+ */
 char *rcs_table="$Id: table.c,v 2.1 1994/04/20 22:07:57 celes Exp $";
 
 #include <stdlib.h>

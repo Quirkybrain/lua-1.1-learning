@@ -1,8 +1,7 @@
-/*
-** hash.c
-** hash manager for lua
-** Luiz Henrique de Figueiredo - 17 Aug 90
-*/
+/**
+ * @file hash.c
+ * @brief 哈希表实现，用于 Lua 表（数组/字典）的底层存储，包含插入、查找、垃圾收集等。
+ */
 
 char *rcs_hash="$Id: hash.c,v 2.1 1994/04/20 22:07:57 celes Exp $";
 

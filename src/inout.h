@@ -1,7 +1,7 @@
-/*
-** $Id: inout.h,v 1.1 1993/12/17 18:41:19 celes Exp $
-*/
-
+/**
+* @file inout.h
+ * @brief 输入/输出声明。
+ */
 
 #ifndef inout_h
 #define inout_h

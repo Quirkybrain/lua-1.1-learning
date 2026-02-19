@@ -1,8 +1,7 @@
-/*
-** Module to control static tables
-** TeCGraf - PUC-Rio
-** $Id: table.h,v 2.1 1994/04/20 22:07:57 celes Exp $
-*/
+/**
+ *@file table.h
+ *@brief 符号表、常量表、字符串表的声明。
+ */
 
 #ifndef table_h
 #define table_h

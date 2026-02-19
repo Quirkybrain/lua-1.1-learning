@@ -1,7 +1,7 @@
-/*
-** strlib.c
-** String library to LUA
-*/
+/**
+ * @file strlib.c
+ * @brief 字符串库，字符串操作。
+ */
 
 char *rcs_strlib="$Id: strlib.c,v 1.2 1994/03/28 15:14:02 celes Exp $";
 

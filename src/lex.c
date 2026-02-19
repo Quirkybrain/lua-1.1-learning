@@ -1,3 +1,8 @@
+/**
+ * @file lex.c
+ * @brief 词法分析器，识别关键字、标识符、数字、字符串等 token，供语法分析器使用。
+ */
+
 char *rcs_lex = "$Id: lex.c,v 2.1 1994/04/15 19:00:28 celes Exp $";
 /*$Log: lex.c,v $
  * Revision 2.1  1994/04/15  19:00:28  celes

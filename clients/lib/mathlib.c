@@ -1,7 +1,7 @@
-/*
-** mathlib.c
-** Mathematics library to LUA
-*/
+/**
+ * @file mathlib.c
+ * @brief 数学库，提供数学函数。
+ */
 
 char *rcs_mathlib="$Id: mathlib.c,v 1.1 1993/12/17 18:41:19 celes Exp $";
 

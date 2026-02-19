@@ -1,10 +1,7 @@
-/*
-** LUA - Linguagem para Usuarios de Aplicacao
-** Grupo de Tecnologia em Computacao Grafica
-** TeCGraf - PUC-Rio
-** $Id: lua.h,v 1.1 1993/12/17 18:41:19 celes Exp $
-*/
-
+/**
+ * @file lua.h
+ * @brief lua API头文件，定义对外函数、对象类型、错误处理等。
+ */
 
 #ifndef lua_h
 #define lua_h

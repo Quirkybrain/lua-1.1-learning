@@ -1,5 +1,9 @@
+/**
+ * @file y.tab.h
+ * @brief 语法分析器生成的 token 定义及 YYSTYPE 联合体。
+ */
 
-typedef union  
+typedef union
 {
  int   vInt;
  long  vLong;

@@ -1,9 +1,7 @@
-/*
-** Math library to LUA
-** TeCGraf - PUC-Rio
-** $Id: mathlib.h,v 1.1 1993/12/17 18:41:19 celes Exp $
-*/
-
+/**
+* @file mathlib.h
+ * @brief 数学库打开函数声明。
+ */
 
 #ifndef strlib_h
 

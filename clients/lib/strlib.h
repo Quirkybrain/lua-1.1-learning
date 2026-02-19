@@ -1,9 +1,7 @@
-/*
-** String library to LUA
-** TeCGraf - PUC-Rio
-** $Id: strlib.h,v 1.1 1993/12/17 18:41:19 celes Exp $
-*/
-
+/**
+* @file strlib.h
+ * @brief 字符串库打开函数声明。
+ */
 
 #ifndef strlib_h
 

@@ -1,7 +1,7 @@
-/*
-** TeCGraf - PUC-Rio
-** $Id: opcode.h,v 2.1 1994/04/20 22:07:57 celes Exp $
-*/
+/**
+ * @file opcode.h
+ * @brief 定义操作码、对象类型 Type、对象结构 Object、字节码宏等。
+ */
 
 #ifndef opcode_h
 #define opcode_h

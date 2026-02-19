@@ -1,8 +1,7 @@
-/*
-** iolib.c
-** Input/output library to LUA
-*/
-
+/**
+ * @file iolib.c
+ * @brief 输入/输出库，用于文件操作。
+ */
 char *rcs_iolib="$Id: iolib.c,v 1.4 1994/04/25 20:11:23 celes Exp $";
 
 #include <stdlib.h>
