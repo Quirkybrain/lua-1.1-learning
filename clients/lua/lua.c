@@ -14,24 +14,20 @@ char *rcs_lua="$Id: lua.c,v 1.1 1993/12/17 18:41:19 celes Exp $";
 
 int main (int argc, char *argv[])
 {
- printf("%d\n", argc);
- printf("argv[0] is: %s\n", argv[0]);
- printf("argv[1] is: %s\n", argv[1]);
- printf("argv[2] is: %s\n", argv[2]);
- printf("argv[3] is: %s\n", argv[3]);
- printf("argv[4] is: %s\n", argv[4]);
  int i;
+ // 注册标准库函数
  iolib_open ();
  strlib_open ();
  mathlib_open ();
- // 仅执行lua二进制文件，创建缓冲区
+
+ // 仅执行lua二进制文件，创建缓冲区，循环读取用户输入
 if (argc < 2)
  {
    char buffer[2048];
    while (gets(buffer) != 0)
      lua_dostring(buffer);
  }
- // 带有参数（例如: ./lua test.lua），执行目标lua文件
+ // 带有参数（例如: ./lua test.lua），执行目标lua源文件
  else
    for (i=1; i<argc; i++)
     lua_dofile (argv[i]);
