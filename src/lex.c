@@ -42,7 +42,11 @@ static char *yytextLast; // 指向 yytext 下一个空闲位置的指针
 static Input input; // 函数指针，用于获取输入
 
 /**
- * @brief 将 current 置为空格，并获取输入函数的指针。
+ * @brief 设置当前输入源并重置当前字符。
+ *
+ * 将 current 初始化为空格 ' '，并注册输入函数；
+ * 提供两种输入方式，从文件读取和从字符串读取。
+ *
  * @param fn 输入函数指针。
  */
 void lua_setinput (Input fn)
