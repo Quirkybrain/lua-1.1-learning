@@ -19,6 +19,10 @@ char *rcs_luastx = "$Id: lua.stx,v 2.4 1994/04/20 16:22:21 celes Exp $";
 #include "table.h"
 #include "lua.h"
 
+extern int yylex(void); // 为 lex.c 中的 yylex() 函数添加声明
+
+int yyparse(); // 为文件内部定义的 yyparse() 添加声明
+
 #define LISTING 0
 
 #ifndef GAPCODE
