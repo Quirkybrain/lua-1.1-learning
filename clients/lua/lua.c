@@ -6,6 +6,7 @@
 char *rcs_lua="$Id: lua.c,v 1.1 1993/12/17 18:41:19 celes Exp $";
 
 #include <stdio.h>
+#include <string.h>
 
 #include "lua.h"
 #include "lualib.h"
@@ -20,12 +21,21 @@ int main (int argc, char *argv[])
  strlib_open ();
  mathlib_open ();
 
- // 仅执行lua二进制文件，创建缓冲区，循环读取用户输入
+ // 交互式执行，创建缓冲区，循环读取用户输入
 if (argc < 2)
  {
    char buffer[2048];
-   while (gets(buffer) != 0)
+   /**
+    * 使用更加安全的 fgets 函数替换 gets 函数，
+    * 防止读取的时候越界。
+    */
+   while (fgets(buffer, sizeof(buffer), stdin) != NULL)
+   {
+     buffer[strcspn(buffer, "\n")] = '\0'; // 去除读取到的换行符 '\n'
      lua_dostring(buffer);
+   }
+   // while (gets(buffer) != 0)
+   //   lua_dostring(buffer);
  }
  // 带有参数（例如: ./lua test.lua），执行目标lua源文件
  else
