@@ -187,7 +187,7 @@ int lua_pushfunction (int file, int function)
   lua_error ("function stack overflow");
   return 1;
  }
- // 压入 functiong stack
+ // 压入 function stack
  funcstack[nfuncstack].file = file;
  funcstack[nfuncstack].function = function;
  nfuncstack++; // 计数器自增
