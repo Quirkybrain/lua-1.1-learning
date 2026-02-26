@@ -1,5 +1,5 @@
 /**
- * @fiel opcode.c
+ * @file opcode.c
  * @brief 虚拟机核心，执行字节码指令（lua_execute），实现栈操作、算术运算、跳转、函数调用等，提供 API 函数的实现。
  */
 
@@ -44,7 +44,7 @@ static Object *top=stack+1, *base=stack+1;
  * @param r SRC 字符串
  * @return 连接成功返回指向新字符串的指针；
  *         连接失败抛出 lua_error 并返回 Null。
- * @note 这是返回的 s 是自增过的指针，指向的是堆上分配的空间索引 1 的位置；
+ * @note 这里返回的 s 是自增过的指针，指向的是堆上分配的空间索引 1 的位置；
  *       此时首标记在 s[-1] 的位置；
  *       满足了垃圾回收等底层机制的需求，又保持了字符串接口的简单和标准。
  */
@@ -112,7 +112,7 @@ static int lua_tonumber (Object *obj)
   */
  if (*ptr)
  {
-  lua_reportbug ("string to number convertion failed");
+  lua_reportbug ("string to number conversion failed");
   return 2;
  }
  tag(obj) = T_NUMBER; // 将 lua 对象的类型转换成 number 类型
@@ -179,7 +179,7 @@ static int lua_tostring (Object *obj)
   * 转换失败得到 Null。
   * 这里的 Null 只是一种防御性编程，
   * 实际上在 lua_strdup() 出现错误会抛出 lua_error,
-  * 使得 "svalue(obj) =" 这一步根本不执行，不会破环数据。
+  * 使得 "svalue(obj) =" 这一步根本不执行，不会破坏数据。
   */
  svalue(obj) = lua_createstring(lua_strdup(s));
  if (svalue(obj) == NULL)
@@ -670,10 +670,15 @@ void lua_travstack (void (*fn)(Object *))
   fn (o);
 }
 
-/*
-** Open file, generate opcode and execute global statement. Return 0 on
-** success or 1 on error.
-*/
+/**
+ * @brief 执行 lua 脚本文件。
+ *
+ * 打开指定的源文件，解析并执行文件全局代码，
+ * 执行结束后自动关闭文件。
+ *
+ * @param filename 文件名
+ * @return 执行成功则返回 0；执行失败则返回错误码 1。
+ */
 int lua_dofile (char *filename)
 {
  if (lua_openfile (filename)) return 1;
@@ -682,31 +687,55 @@ int lua_dofile (char *filename)
  return 0;
 }
 
-/*
-** Generate opcode stored on string and execute global statement. Return 0 on
-** success or 1 on error.
-*/
+/**
+ * @brief 执行 lua 脚本字符串。
+ *
+ * 将给定的字符串作为 lua 代码，解析并执行全局代码，
+ * 执行结束后自动关闭文件。
+ *
+ * @param string 脚本字符串。
+ * @return 执行成功则返回 0；执行失败则返回错误码 1。
+ * @note 原版在此处发生错误时未释放内存，现已修复。
+ */
 int lua_dostring (char *string)
 {
  if (lua_openstring (string)) return 1;
- if (lua_parse ()) return 1;
+ if (lua_parse ())
+ {
+  lua_closestring(); // 添加：释放指向字符串源的指针
+  return 1;
+ }
  lua_closestring();
  return 0;
 }
 
-/*
-** Execute the given function. Return 0 on success or 1 on error.
-*/
+/**
+ * @brief 调用指定的 lua 函数。
+ *
+ * 给定需要调用的函数名和参数个数，在全局符号表中寻找函数对象，
+ * 调整 lua stack 结构，执行字节码序列调用该函数。
+ *
+ * @param functionname 函数名。
+ * @param nparam 传递给该函数的参数个数。注意，参数需要提前压入 lua stack 中。
+ * @return 成功则返回 0；失败则返回 1。
+ *
+ * @note lua stack 调整后结构从下到上依次是：
+ *       函数对象，标记信息（用于分离函数和参数），函数参数。
+ */
 int lua_call (char *functionname, int nparam)
 {
  static Byte startcode[] = {CALLFUNC, HALT};
  int i; 
  Object func = s_object(lua_findsymbol(functionname));
  if (tag(&func) != T_FUNCTION) return 1;
+ // 将 lua stack 中对应参数向上移动两个对象位置
  for (i=1; i<=nparam; i++)
   *(top-i+2) = *(top-i);
+ // 将指针移动到新的栈顶
  top += 2;
+ // 在参数下面添加标记信息 T_MARK
  tag(top-nparam-1) = T_MARK;
+ // 在标记信息下面添加函数对象
  *(top-nparam-2) = func;
  return (lua_execute (startcode));
 }
@@ -813,10 +842,17 @@ void *lua_getuserdata (Object *object)
  else                           return (uvalue(object));
 }
 
-/*
-** Given an object handle and a field name, return its field object.
-** On error, return NULL.
-*/
+/**
+ * @brief 从 lua 表对象中获取指向指定字段的值的指针。
+ *
+ * 给定一个 lua 表对象 @p object (类型为 array ) 和字段名称，
+ * 在表对象中进行查找或者创建这个对应的节点，返回指向节点值的指针。
+ *
+ * @param object lua 表对象，类型为 array。
+ * @param field 字段名称。
+ * @return 成功则返回指向表中指定字段的节点的值的指针；
+ *         失败则返回 Null。
+ */
 Object *lua_getfield (Object *object, char *field)
 {
  if (object == NULL) return NULL;
@@ -831,10 +867,17 @@ Object *lua_getfield (Object *object, char *field)
  }
 }
 
-/*
-** Given an object handle and an index, return its indexed object.
-** On error, return NULL.
-*/
+/**
+ * @brief 从 lua 表对象中获取指向指定索引的值的指针。
+ *
+ * 给定一个 lua 表对象 @p object (类型为 array ) 和索引，
+ * 在表对象中进行查找或者创建这个对应的节点，返回指向节点值的指针。
+ *
+ * @param object lua 表对象，类型为 array。
+ * @param index 索引。
+ * @return 成功则返回指向表中指定索引的节点的值的指针；
+ *         失败则返回 Null。
+ */
 Object *lua_getindexed (Object *object, float index)
 {
  if (object == NULL) return NULL;
@@ -855,7 +898,7 @@ Object *lua_getindexed (Object *object, float index)
  * 根据给定的全局变量名 @p name，在全局符号表中查找对应的索引 n；
  * 返回索引 n 对应的表的对象。
  *
- * @param name 全局变量名
+ * @param name 全局变量名。
  * @return 返回指向名称 @p name 对应的全局符号表中对象的指针。
  */
 Object *lua_getglobal (char *name)
@@ -1156,13 +1199,20 @@ void lua_obj2number (void)
  lua_pushobject (lua_convtonumber(o));
 }
 
-/*
-** Internal function: print object values
-*/
+/**
+ * @brief lua 内置的 print 函数实现。
+ *
+ * 从 lua stack 中依次取出参数，并且根据参数类型进行相应的输出。
+ *
+ * @note 在 table.c 文件中注册为 lua 内置函数，添加到全局符号表。
+ *       如果是表对象，只打印地址而不是展开的内容。
+ * @note 原版在此处发生 obj 指针类型不明确，现已修复。
+ */
 void lua_print (void)
 {
  int i=1;
- void *obj;
+ // void *obj; // lua_getparam 返回的是 lua_Object，指针类型不明确。
+ lua_Object obj = NULL;
  while ((obj=lua_getparam (i++)) != NULL)
  {
   if      (lua_isnumber(obj))    printf("%g\n",lua_getnumber (obj));
@@ -1175,21 +1225,32 @@ void lua_print (void)
  }
 }
 
-/*
-** Internal function: do a file
-*/
+/**
+ * @brief lua 内置的 dofile 函数实现。
+ *
+ * 从 lua stack 中取出参数(文件名)。
+ * 向 lua stack 压入数字 1 表示成功；压入 nil 表示失败。
+ *
+ * @note 在 table.c 文件中注册为 lua 内置函数，添加到全局符号表。
+ */
 void lua_internaldofile (void)
 {
- lua_Object obj = lua_getparam (1);
+ lua_Object obj = lua_getparam (1); // lua 脚本中传入的文件名
+ // 确定传入的是字符串并且能够通过 lua_dofile 执行并解析文件内容。
  if (lua_isstring(obj) && !lua_dofile(lua_getstring(obj)))
   lua_pushnumber(1);
  else
   lua_pushnil();
 }
 
-/*
-** Internal function: do a string
-*/
+/**
+ * @brief lua 内置的 dostring 函数实现。
+ *
+ * 从 lua stack 中取出参数(字符串内容为可执行的 Lua 代码)。
+ * 向 lua stack 压入数字 1 表示成功；压入 nil 表示失败。
+ *
+ * @note 在 table.c 文件中注册为 lua 内置函数，添加到全局符号表。
+ */
 void lua_internaldostring (void)
 {
  lua_Object obj = lua_getparam (1);
