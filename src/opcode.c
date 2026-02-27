@@ -38,7 +38,7 @@ static Object *top=stack+1, *base=stack+1;
  * @brief lua 字符串连接函数。
  *
  * 将 @p r 连接到 @p l 的后面；
- * 在新得到的字符串首尾添加空字符标志 "\0"。
+ * 在新得到的字符串首尾添加空字符标志 '\0'。
  *
  * @param l DEST 字符串
  * @param r SRC 字符串
@@ -51,14 +51,14 @@ static Object *top=stack+1, *base=stack+1;
 static char *lua_strconc (char *l, char *r)
 {
  // 为生成的字符串开辟空间
- // +2 为了预留出首、尾的标记空字符 "\0"
+ // +2 为了预留出首、尾的标记空字符 '\0'
  char *s = calloc (strlen(l)+strlen(r)+2, sizeof(char));
  if (s == NULL)
  {
   lua_error ("not enough memory");
   return NULL;
  }
- *s++ = 0; // 将首位标记为 "\0"
+ *s++ = 0; // 将首位标记为 '\0'
  return strcat(strcpy(s,l),r); // 将字符串 l 复制到 s，再将 r 连接到 s 后面
 }
 
@@ -67,7 +67,7 @@ static char *lua_strconc (char *l, char *r)
  *
  * 为新字符串开辟新的内存空间，并将原字符串复制到新的字符串；
  * 两个字符串之间互不干扰，是一个深拷贝；
- * 在新得到的字符串首尾添加空字符标志 "\0"。
+ * 在新得到的字符串首尾添加空字符标志 '\0'。
  *
  * @param l 指向需要复制的字符串的指针。
  * @return 复制成功则返回指向新字符串的指针；
@@ -194,110 +194,145 @@ static int lua_tostring (Object *obj)
 */
 int lua_execute (Byte *pc)
 {
- Object *oldbase = base;
- base = top;
- while (1)
+ // 进入新的作用域的基本步骤
+ Object *oldbase = base; // 保留原栈基指针
+ base = top; // 栈指针对齐
+ while (1) // 直到遇到 HALT 退出
  {
   OpCode opcode;
+  // 从 pc 读取一个操作码，然后pc自增
   switch (opcode = (OpCode)*pc++)
   {
+   // 将 nil 对象压入 lua stack，栈顶指针自增
    case PUSHNIL: tag(top++) = T_NIL; break;
-   
+
+   // 将 number 对象压入 lua stack，栈顶指针自增
    case PUSH0: tag(top) = T_NUMBER; nvalue(top++) = 0; break;
    case PUSH1: tag(top) = T_NUMBER; nvalue(top++) = 1; break;
    case PUSH2: tag(top) = T_NUMBER; nvalue(top++) = 2; break;
 
+   // 将 byte 对象压入 lua stack，从 pc 读取一个字节压入 lua stack，栈顶指针自增，pc 自增
    case PUSHBYTE: tag(top) = T_NUMBER; nvalue(top++) = *pc++; break;
-   
+
+   /**
+    * 压入一个字到 lua stack。
+    * 这里使用了 union 共享内存的机制（PUSHFLOAT 也用到同样思路），
+    * 通过读取两个 byte 类型的数据到 CodeWord 联合体的结构体变量中，
+    * 再通过 Word 类型变量取出压入 lua stack。
+    */
    case PUSHWORD: 
    {
     CodeWord code;
-    get_word(code,pc);
-    tag(top) = T_NUMBER; nvalue(top++) = code.w;
-   }
-   break;
-   
-   case PUSHFLOAT:
-   {
-    CodeFloat code;
-    get_float(code,pc);
-    tag(top) = T_NUMBER; nvalue(top++) = code.f;
+    get_word(code,pc); // 从 pc 读取两个字节并存入 code
+    tag(top) = T_NUMBER; nvalue(top++) = code.w; // 将字信息压入 lua stack
    }
    break;
 
+   // 压入一个浮点数到 lua stack
+   case PUSHFLOAT:
+   {
+    CodeFloat code;
+    get_float(code,pc); // 从 pc 读取四个字节并存入 code
+    tag(top) = T_NUMBER; nvalue(top++) = code.f; // 将浮点数信息压入 lua stack
+   }
+   break;
+
+   // 压入一个字符串到 lua stack
    case PUSHSTRING:
    {
     CodeWord code;
-    get_word(code,pc);
-    tag(top) = T_STRING; svalue(top++) = lua_constant[code.w];
+    get_word(code,pc); // 从 pc 读取一个字并存入 code 作为索引
+    tag(top) = T_STRING;
+    svalue(top++) = lua_constant[code.w]; // 从全局常量表取出对应字符串并压栈
    }
    break;
-   
+
+   // 局部变量快速访问，通过栈基指针加偏移量的形式计算位置，并将内容复制到栈顶指针处
    case PUSHLOCAL0: case PUSHLOCAL1: case PUSHLOCAL2:
    case PUSHLOCAL3: case PUSHLOCAL4: case PUSHLOCAL5:
    case PUSHLOCAL6: case PUSHLOCAL7: case PUSHLOCAL8:
    case PUSHLOCAL9: *top++ = *(base + (int)(opcode-PUSHLOCAL0)); break;
-   
-   case PUSHLOCAL: *top++ = *(base + (*pc++)); break;
-   
+
+   // 压入指定偏移量的局部变量
+   case PUSHLOCAL: *top++ = *(base + (*pc++)); break; // 从 pc 读取一个字节作为偏移量
+
+   // 压入一个全局变量到 lua stack
    case PUSHGLOBAL: 
    {
     CodeWord code;
-    get_word(code,pc);
-    *top++ = s_object(code.w);
+    get_word(code,pc); // 从 pc 读取一个字并存入 code 作为索引
+    *top++ = s_object(code.w); // 从全局符号表中取出对应全局变量并压入 lua stack
    }
    break;
-   
+
+   // 执行索引操作，例如 table[ref]
    case PUSHINDEXED:
-    --top;
+    /**
+     * 从下到栈顶数据依次是：表，索引
+     */
+    --top; // 将栈顶指针指向索引
+    // 通过索引查询的必须是一个 array 类型对象
     if (tag(top-1) != T_ARRAY)
     {
      lua_reportbug ("indexed expression not a table");
      return 1;
     }
     {
-     Object *h = lua_hashdefine (avalue(top-1), top);
+     Object *h = lua_hashdefine (avalue(top-1), top); // 查询到索引对应的值(val)
      if (h == NULL) return 1;
-     *(top-1) = *h;
+     *(top-1) = *h; // 将查询到的结果压入 lua stack，替代栈中原先的 array 对象位置的数据
     }
    break;
-   
+
+   // 为 lua stack 对象添加特殊标记
    case PUSHMARK: tag(top++) = T_MARK; break;
-   
+
+   // 复制 lua stack 中从栈顶向下第3个对象到栈顶
    case PUSHOBJECT: *top = *(top-3); top++; break;
-   
+
+   // 局部变量快速存储，通过栈基指针加偏移量的形式计算位置，将栈顶对象弹出并复制到此处
    case STORELOCAL0: case STORELOCAL1: case STORELOCAL2:
    case STORELOCAL3: case STORELOCAL4: case STORELOCAL5:
    case STORELOCAL6: case STORELOCAL7: case STORELOCAL8:
    case STORELOCAL9: *(base + (int)(opcode-STORELOCAL0)) = *(--top); break;
-    
+
+   // 弹出栈顶数据并存储到指定偏移量的局部变量处
    case STORELOCAL: *(base + (*pc++)) = *(--top); break;
-   
+
+   // 存储全局变量
    case STOREGLOBAL:
    {
     CodeWord code;
-    get_word(code,pc);
-    s_object(code.w) = *(--top);
+    get_word(code,pc); // 从 pc 读取一个字并存入 code 作为索引
+    s_object(code.w) = *(--top); // 将栈顶对象弹出并存储到全局符号表对应索引处
    }
    break;
 
+   // 执行表赋值 例如 table[ref] = value
    case STOREINDEXED0:
+    /**
+     * 从下到栈顶的对象内容依次是：表对象，索引，值
+     */
+    // 类型检查，必须是表类型(array)
     if (tag(top-3) != T_ARRAY)
     {
      lua_reportbug ("indexed expression not a table");
      return 1;
     }
     {
+     // 通过表和索引创建对应节点并且得到指向值的指针
      Object *h = lua_hashdefine (avalue(top-3), top-2);
      if (h == NULL) return 1;
+     // 将值存储到对应的节点
      *h = *(top-1);
     }
-    top -= 3;
+    top -= 3; // 弹出 lua stack
    break;
-   
+
+   // 执行带有偏移量 n 的表赋值
    case STOREINDEXED:
    {
-    int n = *pc++;
+    int n = *pc++; // 从 pc 读取一个字节作为偏移量
     if (tag(top-3-n) != T_ARRAY)
     {
      lua_reportbug ("indexed expression not a table");
@@ -311,83 +346,121 @@ int lua_execute (Byte *pc)
     top--;
    }
    break;
-   
+
+   // 存储表
    case STORELIST0:
    case STORELIST:
    {
-    int m, n;
+    /**
+     * 从下到栈顶依次是：表对象，n 个元素
+     */
+    int m, n; // m 是索引偏移，n 是元素个数
     Object *arr;
     if (opcode == STORELIST0) m = 0;
     else m = *(pc++) * FIELDS_PER_FLUSH;
-    n = *(pc++);
-    arr = top-n-1;
+    n = *(pc++); // 从 pc 中获得元素个数
+    arr = top-n-1; // 得到指向表对象的指针
+    // 类型检查，必须是表类型(array)
     if (tag(arr) != T_ARRAY)
     {
      lua_reportbug ("internal error - table expected");
      return 1;
     }
+    /**
+     * 遍历每个元素
+     *
+     * 每处理一个就弹出一个，最终 lua stack 中元素都将弹出，仅留下表对象。
+     */
     while (n)
     {
-     tag(top) = T_NUMBER; nvalue(top) = n+m;
+     tag(top) = T_NUMBER;
+     nvalue(top) = (float)(n+m); // 计算出索引并存在栈顶空位置
+     // 创建对应索引的节点并将值(value)设置成栈顶数据
      *(lua_hashdefine (avalue(arr), top)) = *(top-1);
      top--;
      n--;
     }
    }
    break;
-   
+
+   // 存储字符串，用于初始化表的记录
    case STORERECORD:
    {
-    int n = *(pc++);
-    Object *arr = top-n-1;
+    int n = *(pc++); // 从 pc 中获得元素个数
+    Object *arr = top-n-1; // 得到指向表对象的指针
+    // 类型检查，必须是表类型(array)
     if (tag(arr) != T_ARRAY)
     {
      lua_reportbug ("internal error - table expected");
      return 1;
     }
+
+    /**
+     * 遍历每个元素
+     *
+     * 每处理一个就弹出一个，最终 lua stack 中元素都将弹出，仅留下表对象。
+     */
     while (n)
     {
      CodeWord code;
-     get_word(code,pc);
-     tag(top) = T_STRING; svalue(top) = lua_constant[code.w];
+     get_word(code,pc); // 从 pc 读取一个字并存入 code，作为索引
+     tag(top) = T_STRING;
+     svalue(top) = lua_constant[code.w]; // 从全局常量表取出对应字符串并存在栈顶空位置
+     // 创建对应索引的节点并将值(value)设置成栈顶数据
      *(lua_hashdefine (avalue(arr), top)) = *(top-1);
      top--;
      n--;
     }
    }
    break;
-   
+
+   // 调整栈顶到指定位置
    case ADJUST:
    {
-    Object *newtop = base + *(pc++);
+    Object *newtop = base + *(pc++); // 计算栈顶指针的位置(相对于栈基指针)
+
+    /**
+     * 如果栈顶指针位置比计算得到的 newtop 低，
+     * 栈顶指针上移并加入 nil 对象；
+     * 直到栈顶指针指向新位置结束。
+     */
     while (top < newtop) tag(top++) = T_NIL;
-    top = newtop;  /* top could be bigger than newtop */
+    // 如果栈顶指针比计算得到的 newtop 高，调整栈顶到新位置
+    top = newtop;
    }
    break;
-   
+
+   // 创建新表
    case CREATEARRAY:
+    // 如果栈顶是 nil 对象，默认哈希表容量是 101
     if (tag(top-1) == T_NIL) 
      nvalue(top-1) = 101;
     else 
     {
-     if (tonumber(top-1)) return 1;
+     if (tonumber(top-1)) return 1; // 本身是否为 number 类型，如果不是尝试是否能转换成 number
+     // 如果原本容量小于 0，默认容量是 101
      if (nvalue(top-1) <= 0) nvalue(top-1) = 101;
     }
+    // 弹出栈顶对象，根据容量创建相应哈希表，将表压入栈顶
     avalue(top-1) = lua_createarray(nvalue(top-1));
     if (avalue(top-1) == NULL)
      return 1;
-    tag(top-1) = T_ARRAY;
+    tag(top-1) = T_ARRAY; // 改变标签
    break;
-   
+
+   // 相等比较 (类型(tag)与值(value)都需要相等)
    case EQOP:
    {
-    Object *l = top-2;
-    Object *r = top-1;
-    --top;
+    Object *l = top-2; // 记录符号左边参数
+    Object *r = top-1; // 记录符号右边参数
+    --top; // 弹出右边参数
+
+    // 如果类型不同直接返回 nil 对象
     if (tag(l) != tag(r)) 
-     tag(top-1) = T_NIL;
+     tag(top-1) = T_NIL; // 弹出左边参数 并设置为 nil 对象
     else
     {
+     // 如果值(value)相等则返回 number 类型对象，不相等返回 nil 类型对象
      switch (tag(l))
      {
       case T_NIL:       tag(top-1) = T_NUMBER; break;
@@ -397,30 +470,38 @@ int lua_execute (Byte *pc)
       case T_CFUNCTION: tag(top-1) = (fvalue(l) == fvalue(r)) ? T_NUMBER : T_NIL; break;
       case T_USERDATA:  tag(top-1) = (uvalue(l) == uvalue(r)) ? T_NUMBER : T_NIL; break;
       case T_STRING:    tag(top-1) = (strcmp (svalue(l), svalue(r)) == 0) ? T_NUMBER : T_NIL; break;
-      case T_MARK:      return 1;
+      case T_MARK:      return 1; // 如果是 T_MARK 的特殊标记说明出现错误
      }
     }
+    // 将返回的对象的值(value)设置成 1
     nvalue(top-1) = 1;
    }
    break;
-    
+
+   // 小于比较
    case LTOP:
    {
+    // 小于成立则返回 number 类型对象，不成立返回 nil 类型对象
     Object *l = top-2;
     Object *r = top-1;
     --top;
+
+    // number 类型比较
     if (tag(l) == T_NUMBER && tag(r) == T_NUMBER)
      tag(top-1) = (nvalue(l) < nvalue(r)) ? T_NUMBER : T_NIL;
     else
     {
+     // 本身是否为 string 类型，如果不是尝试是否能转换成 string
      if (tostring(l) || tostring(r))
       return 1;
      tag(top-1) = (strcmp (svalue(l), svalue(r)) < 0) ? T_NUMBER : T_NIL;
     }
+    // 将返回的对象的值(value)设置成 1
     nvalue(top-1) = 1; 
    }
    break;
-   
+
+   // 小于等于比较
    case LEOP:
    {
     Object *l = top-2;
@@ -434,163 +515,195 @@ int lua_execute (Byte *pc)
       return 1;
      tag(top-1) = (strcmp (svalue(l), svalue(r)) <= 0) ? T_NUMBER : T_NIL;
     }
+    // 将返回的对象的值(value)设置成 1
     nvalue(top-1) = 1; 
    }
    break;
-   
+
+   // 加运算
    case ADDOP:
    {
     Object *l = top-2;
     Object *r = top-1;
+    // 本身是否为 number 类型，如果不是尝试是否能转换成 number
     if (tonumber(r) || tonumber(l))
      return 1;
-    nvalue(l) += nvalue(r);
-    --top;
+    nvalue(l) += nvalue(r); // 将右运算数加到左运算数
+    --top; // 弹出右运算数
    }
    break; 
-   
+
+   // 减运算
    case SUBOP:
    {
     Object *l = top-2;
     Object *r = top-1;
+    // 本身是否为 number 类型，如果不是尝试是否能转换成 number
     if (tonumber(r) || tonumber(l))
      return 1;
-    nvalue(l) -= nvalue(r);
-    --top;
+    nvalue(l) -= nvalue(r); // 将右运算数减到左运算数
+    --top; // 弹出右运算数
    }
    break; 
-   
+
+   // 乘运算
    case MULTOP:
    {
     Object *l = top-2;
     Object *r = top-1;
+    // 本身是否为 number 类型，如果不是尝试是否能转换成 number
     if (tonumber(r) || tonumber(l))
      return 1;
-    nvalue(l) *= nvalue(r);
-    --top;
+    nvalue(l) *= nvalue(r); // 将右运算数乘到左运算数
+    --top; // 弹出右运算数
    }
    break; 
-   
+
+   // 除运算
    case DIVOP:
    {
     Object *l = top-2;
     Object *r = top-1;
+    // 本身是否为 number 类型，如果不是尝试是否能转换成 number
     if (tonumber(r) || tonumber(l))
      return 1;
-    nvalue(l) /= nvalue(r);
-    --top;
+    nvalue(l) /= nvalue(r); // 将右运算数除到左运算数
+    --top; // 弹出右运算数
    }
    break; 
-   
+
+   // 字符串连接运算
    case CONCOP:
    {
     Object *l = top-2;
     Object *r = top-1;
+    // 本身是否为 string 类型，如果不是尝试是否能转换成 string
     if (tostring(r) || tostring(l))
      return 1;
+    // 连接字符串并且加入 string table(lua_string) 中，存储到左字符串的位置
     svalue(l) = lua_createstring (lua_strconc(svalue(l),svalue(r)));
     if (svalue(l) == NULL)
      return 1;
-    --top;
+    --top; // 将右字符串弹出
    }
    break; 
-   
+
+   // 一元负号
    case MINUSOP:
+    // 栈顶对象本身是否为 number 类型，如果不是尝试是否能转换成 number
     if (tonumber(top-1))
      return 1;
-    nvalue(top-1) = - nvalue(top-1);
+    nvalue(top-1) = - nvalue(top-1); // 设置成负值
    break; 
-   
+
+   // 逻辑非
    case NOTOP:
+    // 如果栈顶对象是 nil 类型(假)那么设置成 number 类型(真)，不是 nil 则设置成 nil
     tag(top-1) = tag(top-1) == T_NIL ? T_NUMBER : T_NIL;
    break; 
-   
+
+   // 栈顶为真则跳转
    case ONTJMP:
    {
     CodeWord code;
-    get_word(code,pc);
-    if (tag(top-1) != T_NIL) pc += code.w;
+    get_word(code,pc); // 从 pc 中读取一个字的偏移量
+    if (tag(top-1) != T_NIL) pc += code.w; // 如果栈顶为真，pc 加上偏移量
    }
    break;
-   
+
+   // 栈顶为假则跳转
    case ONFJMP:	   
    {
     CodeWord code;
-    get_word(code,pc);
-    if (tag(top-1) == T_NIL) pc += code.w;
+    get_word(code,pc); // 从 pc 中读取一个字的偏移量
+    if (tag(top-1) == T_NIL) pc += code.w; // 如果栈顶为假，pc 加上偏移量
    }
    break;
-   
+
+   // 跳转指令
    case JMP:
    {
     CodeWord code;
-    get_word(code,pc);
-    pc += code.w;
+    get_word(code,pc); // 从 pc 中读取一个字的偏移量
+    pc += code.w; // pc 加上偏移量
    }
    break;
-    
+
+   // 向后跳转
    case UPJMP:
    {
     CodeWord code;
-    get_word(code,pc);
-    pc -= code.w;
+    get_word(code,pc); // 从 pc 中读取一个字的偏移量
+    pc -= code.w; // pc 减去偏移量
    }
    break;
-   
+
+   // 如果弹出的对象是假，跳转
    case IFFJMP:
    {
     CodeWord code;
-    get_word(code,pc);
-    top--;
-    if (tag(top) == T_NIL) pc += code.w;
+    get_word(code,pc);  // 从 pc 中读取一个字的偏移量
+    top--; // 弹出栈顶对象
+    if (tag(top) == T_NIL) pc += code.w; // 如果刚刚弹出的对象为假，pc 加上偏移量
    }
    break;
 
+   // 如果弹出的对象是假，向后跳转
    case IFFUPJMP:
    {
     CodeWord code;
-    get_word(code,pc);
-    top--;
-    if (tag(top) == T_NIL) pc -= code.w;
+    get_word(code,pc); // 从 pc 中读取一个字的偏移量
+    top--; // 弹出栈顶对象
+    if (tag(top) == T_NIL) pc -= code.w; // 如果刚刚弹出的对象为假，pc 减去偏移量
    }
    break;
 
+   // 将栈顶对象弹出栈
    case POP: --top; break;
-   
+
+   // 函数调用
    case CALLFUNC:
    {
     Byte *newpc;
-    Object *b = top-1;
-    while (tag(b) != T_MARK) b--;
+    Object *b = top-1; // 记录栈顶对象
+
+    while (tag(b) != T_MARK) b--; // 向下移动指针直到找到特殊标记 T_MARK
+
+    // 如果特殊标记 T_MARK 下面的对象类型为 T_FUNCTION(lua function)
     if (tag(b-1) == T_FUNCTION)
     {
-     lua_debugline = 0;			/* always reset debug flag */
-     newpc = bvalue(b-1);
-     bvalue(b-1) = pc;		        /* store return code */
-     nvalue(b) = (base-stack);		/* store base value */
-     base = b+1;
-     pc = newpc;
+     lua_debugline = 0; // 重置 debug 行号
+     newpc = bvalue(b-1); // 获取函数地址
+     bvalue(b-1) = pc;	// 保留当前地址
+     nvalue(b) = (base-stack);	// 保存当前栈基指针对于栈底的偏移量到 b(原标记对象)处
+     base = b+1; // 进入函数作用域，将栈基指针指向 b+1
+     pc = newpc; // 传入函数地址
+
+     // 检查栈是否溢出
      if (MAXSTACK-(base-stack) < STACKGAP)
      {
       lua_error ("stack overflow");
       return 1;
      }
     }
+    // 如果特殊标记 T_MARK 下面的对象类型为 T_CFUNCTION(C function)
     else if (tag(b-1) == T_CFUNCTION)
     {
      int nparam; 
-     lua_debugline = 0;			/* always reset debug flag */
-     nvalue(b) = (base-stack);		/* store base value */
-     base = b+1;
-     nparam = top-base;			/* number of parameters */
-     (fvalue(b-1))();			/* call C function */
-     
-     /* shift returned values */
+     lua_debugline = 0;	// 重置 debug 行号
+     nvalue(b) = (base-stack);		// 保存当前栈基指针对于栈底的偏移量到 b(原标记对象)处
+     base = b+1; // 进入函数作用域，将栈基指针指向 b+1
+     nparam = top-base;	// 参数个数
+     (fvalue(b-1))();	// 调用 C 函数
+
      { 
       int i;
-      int nretval = top - base - nparam;
+      int nretval = top - base - nparam; // 计算返回多少个参数
+      // 退出函数作用域，将栈顶指针和栈基指针置回原位
       top = base - 2;
       base = stack + (int) nvalue(base-1);
+
+      // 通过循环将函数得到的返回结果压入栈
       for (i=0; i<nretval; i++)
       {
        *top = *(top+nparam+2);
@@ -605,15 +718,19 @@ int lua_execute (Byte *pc)
     }
    }
    break;
-   
+
+   // 从函数返回
    case RETCODE:
    {
     int i;
-    int shift = *pc++;
-    int nretval = top - base - shift;
+    int shift = *pc++; // 参数与局部变量个数的和
+    int nretval = top - base - shift; // 计算返回多少个参数
+    // 退出函数作用域，将栈顶指针和栈基指针置回原位
     top = base - 2;
-    pc = bvalue(base-2);
+    pc = bvalue(base-2); // 获取调用函数前的执行地址
     base = stack + (int) nvalue(base-1);
+
+    // 通过循环将函数得到的返回结果压入栈
     for (i=0; i<nretval; i++)
     {
      *top = *(top+shift+2);
@@ -621,21 +738,23 @@ int lua_execute (Byte *pc)
     }
    }
    break;
-   
+
+   // 退出操作码
    case HALT:
-    base = oldbase;
+    base = oldbase; // 退出当前作用域
    return 0;		/* success */
    
    case SETFUNCTION:
    {
     CodeWord file, func;
-    get_word(file,pc);
-    get_word(func,pc);
+    get_word(file,pc); // 获取文件信息
+    get_word(func,pc); // 获取函数信息
     if (lua_pushfunction (file.w, func.w))
      return 1;
    }
    break;
-   
+
+   // 设置 debug 行号
    case SETLINE:
    {
     CodeWord code;
@@ -643,7 +762,8 @@ int lua_execute (Byte *pc)
     lua_debugline = code.w;
    }
    break;
-   
+
+   // 弹出当前函数
    case RESET:
     lua_popfunction ();
    break;
