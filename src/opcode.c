@@ -189,9 +189,11 @@ static int lua_tostring (Object *obj)
 }
 
 
-/*
-** Execute the given opcode. Return 0 in success or 1 on error.
-*/
+/**
+ * @brief 执行操作码。
+ * @param pc 指令指针。
+ * @return 返回 0 表示成功；返回 1 表示失败。
+ */
 int lua_execute (Byte *pc)
 {
  // 进入新的作用域的基本步骤
@@ -599,7 +601,16 @@ int lua_execute (Byte *pc)
    // 逻辑非
    case NOTOP:
     // 如果栈顶对象是 nil 类型(假)那么设置成 number 类型(真)，不是 nil 则设置成 nil
-    tag(top-1) = tag(top-1) == T_NIL ? T_NUMBER : T_NIL;
+    // tag(top-1) = tag(top-1) == T_NIL ? T_NUMBER : T_NIL;
+    // 应该将 nil 反成数字 1 表示真，而不是乱码
+    if (tag(top-1) == T_NIL)
+    {
+     tag(top-1) = T_NUMBER;
+     nvalue(top-1) = 1;
+    } else
+    {
+     tag(top-1) = T_NIL;
+    }
    break; 
 
    // 栈顶为真则跳转
