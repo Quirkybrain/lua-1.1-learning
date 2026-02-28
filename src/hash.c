@@ -277,7 +277,7 @@ Hash *lua_createarray (int nhash)
   return NULL;
  }
 
- // 如果计数器到达阈值那么触发垃圾回收器。
+ // 如果实例计数器到达阈值那么触发垃圾回收器。
  if (lua_nentity == lua_block)
   lua_pack(); 
 

@@ -38,10 +38,10 @@ static Object *top=stack+1, *base=stack+1;
  * @brief lua 字符串连接函数。
  *
  * 将 @p r 连接到 @p l 的后面；
- * 在新得到的字符串首尾添加空字符标志 '\0'。
+ * 在新得到的字符串最前面预留了一个用于垃圾收集(GC)时的标记(mark)字节。
  *
- * @param l DEST 字符串
- * @param r SRC 字符串
+ * @param l DEST 字符串。
+ * @param r SRC 字符串。
  * @return 连接成功返回指向新字符串的指针；
  *         连接失败抛出 lua_error 并返回 Null。
  * @note 这里返回的 s 是自增过的指针，指向的是堆上分配的空间索引 1 的位置；
@@ -51,14 +51,14 @@ static Object *top=stack+1, *base=stack+1;
 static char *lua_strconc (char *l, char *r)
 {
  // 为生成的字符串开辟空间
- // +2 为了预留出首、尾的标记空字符 '\0'
+ // +2 为了在最前面预留一个用于垃圾收集(GC)时的标记(mark)字节尾的标记和结尾空字符 '\0'
  char *s = calloc (strlen(l)+strlen(r)+2, sizeof(char));
  if (s == NULL)
  {
   lua_error ("not enough memory");
   return NULL;
  }
- *s++ = 0; // 将首位标记为 '\0'
+ *s++ = 0; // 将首位标记为 0
  return strcat(strcpy(s,l),r); // 将字符串 l 复制到 s，再将 r 连接到 s 后面
 }
 
@@ -67,7 +67,7 @@ static char *lua_strconc (char *l, char *r)
  *
  * 为新字符串开辟新的内存空间，并将原字符串复制到新的字符串；
  * 两个字符串之间互不干扰，是一个深拷贝；
- * 在新得到的字符串首尾添加空字符标志 '\0'。
+ * 在新得到的字符串最前面预留了一个用于垃圾收集(GC)时的标记(mark)字节。
  *
  * @param l 指向需要复制的字符串的指针。
  * @return 复制成功则返回指向新字符串的指针；
@@ -81,7 +81,7 @@ char *lua_strdup (char *l)
   lua_error ("not enough memory");
   return NULL;
  }
- *s++ = 0; 			/* create mark space */
+ *s++ = 0;
  return strcpy(s,l);
 }
 
@@ -787,7 +787,7 @@ int lua_execute (Byte *pc)
 }
 
 /**
- * @brief 遍历 lua stack 中所有对象并调用回调函数 fn。
+ * @brief 遍历 lua stack 中所有对象，并执行给定的函数。
  *
  * 通过栈指针遍历栈内有效数据，从 (top-1) 到栈底；
  * 包含 stack[0] 的特殊标记。
