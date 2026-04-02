@@ -1108,6 +1108,25 @@ int lua_pushnumber (real n)
  * @brief 将 string 类型对象压入 lua stack。
  *
  * @return 压栈成功则返回 0；压栈失败(lua stack 溢出)则返回 1。
+ * 
+ * @warning bug：使用 test.lua 文件中的 save.lua 触发段错误。
+ *          错误类型判断：
+ *            时序错误。
+ *          错误原因分析：
+ *          调用链(string 类型为例)：
+ *            lua_type() -> lua_pushstring() -> 
+ *            lua_createstring() -> lua_pack() -> 
+ *            lua_markobject()
+ *          在 lua_pushstring 函数中在栈创建了对象，对 tag 进行了标记；
+ *          压栈过程中触发了 GC，然后 GC 扫栈时读到了一个 tag 已经是 T_STRING；
+ *          但字符串指针还没真正写好的半初始化对象；
+ *          最后在 markstring(svalue(o)) 这里解引用野指针，导致段错误。
+ * 
+ *          时序：
+ *            理想情况下，先进行赋值后指针上移动；
+ *            所以赋值的时候这个对象并未压入栈中，GC 扫描不到。
+ *            但是函数的赋值和 top++ 的完成顺序属于未定义行为；
+ *            存在先完成 top++ (即完成压栈)，再 GC 进行扫描导致崩溃的情况。
  */
 int lua_pushstring (char *s)
 {
@@ -1117,8 +1136,19 @@ int lua_pushstring (char *s)
   lua_error ("stack overflow");
   return 1;
  }
- tag(top) = T_STRING; 
- svalue(top++) = lua_createstring(lua_strdup(s)); // 赋值并将栈顶指针(top)向上移动
+
+ char* str;
+ str = lua_createstring(lua_strdup(s));
+
+ if (str == NULL) {
+  return 1;
+ }
+ 
+ tag(top) = T_STRING;
+ svalue(top) = str;
+ top++;
+//  tag(top) = T_STRING; 
+//  svalue(top++) = lua_createstring(lua_strdup(s)); // 赋值并将栈顶指针(top)向上移动
  return 0;
 }
 
