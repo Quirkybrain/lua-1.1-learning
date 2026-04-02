@@ -88,35 +88,40 @@ static int head (Hash *t, Object *ref)		/* hash function */
  * @param ref 指向 Object 结构体的指针。
  * @param h 通过哈希函数计算得到的桶索引。
  * @return 如果找到那么返回指向节点的指针；如果没找到返回 Null。
+ * 
+ * @note 更改成更有意义的函数名，注释掉原来的无用代码。
  */
-static Node *present(Hash *t, Object *ref, int h)
+static Node *hashFindNode(Hash *t, Object *ref, int h)
 {
- /**
-  * n 指向当前节点
-  * p 指向前一节点（根据被屏蔽的代码可看出p可能是为了去除节点而创建的）
-  */
- Node *n=NULL, *p;
+//  /**
+//   * n 指向当前节点
+//   * p 指向前一节点（根据被屏蔽的代码可看出p可能是为了去除节点而创建的）
+//   */
+//  Node *n=NULL, *p;
+ Node* n = NULL;
 
  if (tag(ref) == T_NUMBER)
  {
-  for (p=NULL,n=list(t,h); n!=NULL; p=n, n=n->next)
+  // for (p=NULL,n=list(t,h); n!=NULL; p=n, n=n->next)
+  for (n=list(t,h); n !- NULL; n=n->next)
    if (ref_tag(n) == T_NUMBER && nvalue(ref) == ref_nvalue(n)) break;
  }  
  else if (tag(ref) == T_STRING)
  {
-  for (p=NULL,n=list(t,h); n!=NULL; p=n, n=n->next)
+  // for (p=NULL,n=list(t,h); n!=NULL; p=n, n=n->next)
+  for (n = list(t,h); n != NULL; n = n->next)
    if (ref_tag(n) == T_STRING && streq(svalue(ref),ref_svalue(n))) break;
  }  
  if (n==NULL)				/* name not present */
   return NULL;
-#if 0
- if (p!=NULL)				/* name present but not first */
- {
-  p->next=n->next;			/* move-to-front self-organization */
-  n->next=list(t,h);
-  list(t,h)=n;
- }
-#endif
+// #if 0
+//  if (p!=NULL)				/* name present but not first */
+//  {
+//   p->next=n->next;			/* move-to-front self-organization */
+//   n->next=list(t,h);
+//   list(t,h)=n;
+//  }
+// #endif
  return n;
 }
 
@@ -144,7 +149,8 @@ static void freelist (Node *n)
  *
  * @param nhash 哈希表容量。
  * @return 创建成功返回指向哈希表的指针；创建失败返回空指针并报错。
- * @note 创建的哈希表需要手动释放空间。
+ * @note 创建的哈希表需要手动释放空间;
+ *       补充了失败时候的节点释放。
  */
 static Hash *hashcreate (unsigned int nhash)
 {
@@ -159,6 +165,7 @@ static Hash *hashcreate (unsigned int nhash)
  nodelist(t) = newvector (nhash, Node*);
  if (nodelist(t) == NULL)
  {
+  free(t);
   lua_error ("not enough memory");
   return NULL;
  }
@@ -261,6 +268,7 @@ void lua_hashcollector (void)
  *         创建失败则返回 Null。
  *
  * @warning 垃圾回收不安全会导致 stack 溢出。
+ * @note 补充了失败时候的节点释放。
  */
 Hash *lua_createarray (int nhash)
 {
@@ -273,6 +281,7 @@ Hash *lua_createarray (int nhash)
  new->array = hashcreate(nhash);
  if (new->array == NULL)
  {
+  free(new);
   lua_error ("not enough memory");
   return NULL;
  }
@@ -287,41 +296,118 @@ Hash *lua_createarray (int nhash)
  return new->array;
 }
 
-
 /**
- * @brief 在哈希表中查找或创建与给定 ref 对应的节点并返回节点 val 的指针。
- *
- * 调用 head() 根据 @p t 和 @p ref 找到对应的桶索引；
- * 通过 present() 在桶索引的链表中搜索键对应的节点；
- * 如果在桶的链表中没有找到 @p ref，创建新节点并将键设置成 @p ref；
- * val 设置成 nil 类型，并将创建的节点插入桶链表的首位；
+ * @brief 在指定桶中创建新节点并插入到链表头。
  *
  * @param t 指向目标哈希表的指针。
  * @param ref 指向键对象的指针。
- * @return 成功则返回指向节点值(val)的指针；失败则返回 Null。
+ * @param h 桶索引。
+ * @return 创建成功则返回新节点指针；失败则返回 Null。
  */
-Object *lua_hashdefine (Hash *t, Object *ref)
+static Node* hashNewNode(Hash* t, Object* ref, int h) {
+  Node* n = new(Node);
+  if (n == NULL) {
+    lua_error("not enough memory");
+    return NULL;
+  }
+  n->ref = *ref;
+  tag(&n->val) = T_NIL;
+  n->next = list(t, h);
+  list(t, h) = n;
+  return n;
+}
+
+// /**
+//  * @brief 在哈希表中查找或创建与给定 ref 对应的节点并返回节点 val 的指针。
+//  *
+//  * 调用 head() 根据 @p t 和 @p ref 找到对应的桶索引；
+//  * 通过 present() 在桶索引的链表中搜索键对应的节点；
+//  * 如果在桶的链表中没有找到 @p ref，创建新节点并将键设置成 @p ref；
+//  * val 设置成 nil 类型，并将创建的节点插入桶链表的首位；
+//  *
+//  * @param t 指向目标哈希表的指针。
+//  * @param ref 指向键对象的指针。
+//  * @return 成功则返回指向节点值(val)的指针；失败则返回 Null。
+//  */
+// Object *lua_hashdefine (Hash *t, Object *ref)
+// {
+//  int   h;
+//  Node *n;
+//  h = head (t, ref);
+//  if (h < 0) return NULL; 
+ 
+//  n = present(t, ref, h);
+//  if (n == NULL)
+//  {
+//   n = new(Node);
+//   if (n == NULL)
+//   {
+//    lua_error ("not enough memory");
+//    return NULL;
+//   }
+//   n->ref = *ref;
+//   tag(&n->val) = T_NIL;
+//   n->next = list(t,h);
+//   list(t,h) = n;
+//  }
+//  return (&n->val);
+// }
+
+/**
+ * @brief 在哈希表中查找与给定 ref 对应的节点并返回节点 val 的指针。
+ *
+ * 调用 head() 根据 @p t 和 @p ref 找到对应的桶索引；
+ * 通过 hashFindNode() 在桶索引的链表中搜索键对应的节点；
+ * 如果没有找到，则返回 Null, 不修改哈希表结构。
+ *
+ * @param t 指向目标哈希表的指针。
+ * @param ref 指向键对象的指针。
+ * @return 成功则返回指向节点值(val)的指针；未找到或失败则返回 Null。
+ * @note 原函数会导致创建 nil 节点从而影响哈希表结构；
+ *       此处修改成找不到就不修改哈希表结构。
+ */
+Object *lua_hashGet (Hash *t, Object *ref)
 {
  int   h;
  Node *n;
  h = head (t, ref);
  if (h < 0) return NULL; 
  
- n = present(t, ref, h);
+ n = hashFindNode(t, ref, h);
  if (n == NULL)
  {
-  n = new(Node);
-  if (n == NULL)
-  {
-   lua_error ("not enough memory");
-   return NULL;
-  }
-  n->ref = *ref;
-  tag(&n->val) = T_NIL;
-  n->next = list(t,h);
-  list(t,h) = n;
+  return NULL;
  }
  return (&n->val);
+}
+
+/**
+ * @brief 在哈希表中查找或创建与给定 @p ref 对应的节点，并返回节点 val 的指针。
+ * 
+ * 调用 head() 根据 @p t 和 @p ref 找到对应的桶索引；
+ * 通过 hashFindNode() 在桶中搜索对应节点；
+ * 如果在桶的链表中没有找到 @p ref 则创建新的节点并返回其值槽位。
+ * 
+ * @param t 指向目标哈希表的指针。
+ * @param ref 指向键对象的指针。
+ * @return 成功则返回指向节点的值(val)的指针；失败则返回 Null。
+ */
+Object* lua_hashEnsure(Hash* t, Object* ref) {
+  int h;
+  Node* n;
+  h = head(t, ref);
+  if (h < 0) {
+    return NULL;
+  }
+
+  n = hashFindNode(t, ref, h);
+  if (n == NULL) {
+    n = hashNewNode(t, ref, h);
+    if (n == NULL) {
+      return NULL;
+    }
+    return (&n->val);
+  }
 }
 
 /**

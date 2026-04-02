@@ -24,7 +24,9 @@ typedef struct Hash
 Hash    *lua_createarray (int nhash);
 void     lua_hashmark (Hash *h);
 void     lua_hashcollector (void);
-Object 	*lua_hashdefine (Hash *t, Object *ref);
+// Object 	*lua_hashdefine (Hash *t, Object *ref);
+Object* lua_hashGet(Hash *t, Object* ref);
+Object* lua_hashEnsure(Hash *t, Object* ref);
 void     lua_next (void);
 
 #endif
