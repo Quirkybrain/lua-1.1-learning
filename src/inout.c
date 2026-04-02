@@ -199,9 +199,15 @@ int lua_pushfunction (int file, int function)
  *
  * 在执行 RESET 操作码的时候，
  * 将函数对应的文件的文件索引和函数名索引弹出 function stack。
+ * @note 补充了下溢报错。
  */
 void lua_popfunction (void)
 {
+ if (nfuncstack <= 0) {
+  lua_error("function stack underflow");
+  nfuncstack = 0;
+  return;
+ }
  nfuncstack--; // 计数器自减
 }
 
