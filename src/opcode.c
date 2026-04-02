@@ -267,7 +267,7 @@ int lua_execute (Byte *pc)
    }
    break;
 
-   // 执行索引操作，例如 table[ref]
+   // 执行索引操作，只读查找，例如 table[ref]
    case PUSHINDEXED:
     /**
      * 从下到栈顶数据依次是：表，索引
@@ -279,11 +279,17 @@ int lua_execute (Byte *pc)
      lua_reportbug ("indexed expression not a table");
      return 1;
     }
-    {
-     Object *h = lua_hashdefine (avalue(top-1), top); // 查询到索引对应的值(val)
-     if (h == NULL) return 1;
-     *(top-1) = *h; // 将查询到的结果压入 lua stack，替代栈中原先的 array 对象位置的数据
+    Object* h = lua_hashGet(avalue(top-1), top); // 查询到索引对应的值(val)
+    if (h == NULL) {
+      tag(top-1) = T_NIL;
+    } else {
+      *(top-1) = *h;
     }
+    // {
+    //  Object *h = lua_hashdefine (avalue(top-1), top); // 查询到索引对应的值(val)
+    //  if (h == NULL) return 1;
+    //  *(top-1) = *h; // 将查询到的结果压入 lua stack，替代栈中原先的 array 对象位置的数据
+    // }
    break;
 
    // 为 lua stack 对象添加特殊标记
@@ -323,7 +329,8 @@ int lua_execute (Byte *pc)
     }
     {
      // 通过表和索引创建对应节点并且得到指向值的指针
-     Object *h = lua_hashdefine (avalue(top-3), top-2);
+    //  Object *h = lua_hashdefine (avalue(top-3), top-2);
+     Object *h = lua_hashEnsure (avalue(top-3), top-2);
      if (h == NULL) return 1;
      // 将值存储到对应的节点
      *h = *(top-1);
@@ -341,7 +348,8 @@ int lua_execute (Byte *pc)
      return 1;
     }
     {
-     Object *h = lua_hashdefine (avalue(top-3-n), top-2-n);
+    //  Object *h = lua_hashdefine (avalue(top-3-n), top-2-n);
+     Object *h = lua_hashEnsure (avalue(top-3-n), top-2-n);
      if (h == NULL) return 1;
      *h = *(top-1);
     }
@@ -378,7 +386,8 @@ int lua_execute (Byte *pc)
      tag(top) = T_NUMBER;
      nvalue(top) = (float)(n+m); // 计算出索引并存在栈顶空位置
      // 创建对应索引的节点并将值(value)设置成栈顶数据
-     *(lua_hashdefine (avalue(arr), top)) = *(top-1);
+    //  *(lua_hashdefine (avalue(arr), top)) = *(top-1);
+     *(lua_hashEnsure (avalue(arr), top)) = *(top-1);
      top--;
      n--;
     }
@@ -409,7 +418,8 @@ int lua_execute (Byte *pc)
      tag(top) = T_STRING;
      svalue(top) = lua_constant[code.w]; // 从全局常量表取出对应字符串并存在栈顶空位置
      // 创建对应索引的节点并将值(value)设置成栈顶数据
-     *(lua_hashdefine (avalue(arr), top)) = *(top-1);
+    //  *(lua_hashdefine (avalue(arr), top)) = *(top-1);
+     *(lua_hashEnsure (avalue(arr), top)) = *(top-1);
      top--;
      n--;
     }
@@ -977,12 +987,13 @@ void *lua_getuserdata (Object *object)
  * @brief 从 lua 表对象中获取指向指定字段的值的指针。
  *
  * 给定一个 lua 表对象 @p object (类型为 array ) 和字段名称，
- * 在表对象中进行查找或者创建这个对应的节点，返回指向节点值的指针。
+ * 在表对象中查找对应的节点，返回指向节点值的指针。
  *
  * @param object lua 表对象，类型为 array。
  * @param field 字段名称。
  * @return 成功则返回指向表中指定字段的节点的值的指针；
  *         失败则返回 Null。
+ * @note 只读查找。
  */
 Object *lua_getfield (Object *object, char *field)
 {
@@ -994,7 +1005,8 @@ Object *lua_getfield (Object *object, char *field)
   Object ref;
   tag(&ref) = T_STRING;
   svalue(&ref) = lua_createstring(lua_strdup(field));
-  return (lua_hashdefine(avalue(object), &ref));
+  // return (lua_hashdefine(avalue(object), &ref));
+  return (lua_hashGet(avalue(object), &ref));
  }
 }
 
@@ -1002,12 +1014,13 @@ Object *lua_getfield (Object *object, char *field)
  * @brief 从 lua 表对象中获取指向指定索引的值的指针。
  *
  * 给定一个 lua 表对象 @p object (类型为 array ) 和索引，
- * 在表对象中进行查找或者创建这个对应的节点，返回指向节点值的指针。
+ * 在表对象中查找这个对应的节点，返回指向节点值的指针。
  *
  * @param object lua 表对象，类型为 array。
  * @param index 索引。
  * @return 成功则返回指向表中指定索引的节点的值的指针；
  *         失败则返回 Null。
+ * @note 只读查找。
  */
 Object *lua_getindexed (Object *object, float index)
 {
@@ -1019,7 +1032,8 @@ Object *lua_getindexed (Object *object, float index)
   Object ref;
   tag(&ref) = T_NUMBER;
   nvalue(&ref) = index;
-  return (lua_hashdefine(avalue(object), &ref));
+  // return (lua_hashdefine(avalue(object), &ref));
+  return (lua_hashGet(avalue(object), &ref));
  }
 }
 
@@ -1184,7 +1198,7 @@ int lua_storeglobal (char *name)
  * @brief 将栈顶对象存储到表对象(array)的指定字段。
  *
  * 字段名 @p field 会被转换为字符串对象作为键(ref)，
- * 调用 hash_define() 函数在数组的哈希表中查找或创建对应的节点；
+ * 调用 lua_hashEnsure() 函数在数组的哈希表中查找或创建对应的节点；
  * 如果栈顶对象不是特殊标记 (T_MARK) 将该元素弹出，
  * 并储存在对应节点的值(val)中。
  *
@@ -1202,7 +1216,8 @@ int lua_storefield (lua_Object object, char *field)
   Object ref, *h;
   tag(&ref) = T_STRING;
   svalue(&ref) = lua_createstring(lua_strdup(field));
-  h = lua_hashdefine(avalue(object), &ref);
+  // h = lua_hashdefine(avalue(object), &ref);
+  h = lua_hashEnsure(avalue(object), &ref);
   if (h == NULL) return 1;
   if (tag(top-1) == T_MARK) return 1;
   *h = *(--top);
@@ -1215,7 +1230,7 @@ int lua_storefield (lua_Object object, char *field)
  * @brief 将栈顶对象存储到表对象(array)的指定索引。
  *
  * 索引 @p index 会被转换为 T_NUMBER 类型对象作为键(ref)，
- * 调用 hash_define() 函数在数组的哈希表中查找或创建对应的节点；
+ * 调用 lua_hashEnsure() 函数在数组的哈希表中查找或创建对应的节点；
  * 如果栈顶对象不是特殊标记 (T_MARK) 将该元素弹出，
  * 并储存在对应节点的值(val)中。
  *
@@ -1233,7 +1248,7 @@ int lua_storeindexed (lua_Object object, float index)
   Object ref, *h;
   tag(&ref) = T_NUMBER;
   nvalue(&ref) = index;
-  h = lua_hashdefine(avalue(object), &ref);
+  h = lua_hashEnsure(avalue(object), &ref);
   if (h == NULL) return 1;
   if (tag(top-1) == T_MARK) return 1;
   *h = *(--top);
@@ -1390,5 +1405,3 @@ void lua_internaldostring (void)
  else
   lua_pushnil();
 }
-
-
