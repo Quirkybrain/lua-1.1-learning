@@ -103,7 +103,7 @@ static Node *hashFindNode(Hash *t, Object *ref, int h)
  if (tag(ref) == T_NUMBER)
  {
   // for (p=NULL,n=list(t,h); n!=NULL; p=n, n=n->next)
-  for (n=list(t,h); n !- NULL; n=n->next)
+  for (n=list(t,h); n != NULL; n=n->next)
    if (ref_tag(n) == T_NUMBER && nvalue(ref) == ref_nvalue(n)) break;
  }  
  else if (tag(ref) == T_STRING)
