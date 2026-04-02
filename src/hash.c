@@ -307,8 +307,8 @@ Hash *lua_createarray (int nhash)
 static Node* hashNewNode(Hash* t, Object* ref, int h) {
   Node* n = new(Node);
   if (n == NULL) {
-    lua_error("not enough memory");
-    return NULL;
+   lua_error("not enough memory");
+   return NULL;
   }
   n->ref = *ref;
   tag(&n->val) = T_NIL;
@@ -397,17 +397,17 @@ Object* lua_hashEnsure(Hash* t, Object* ref) {
   Node* n;
   h = head(t, ref);
   if (h < 0) {
-    return NULL;
+   return NULL;
   }
 
   n = hashFindNode(t, ref, h);
   if (n == NULL) {
-    n = hashNewNode(t, ref, h);
-    if (n == NULL) {
-      return NULL;
-    }
-    return (&n->val);
+   n = hashNewNode(t, ref, h);
+   if (n == NULL) {
+    return NULL;
+   }
   }
+  return (&n->val);
 }
 
 /**
