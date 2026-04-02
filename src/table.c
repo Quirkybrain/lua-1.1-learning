@@ -182,6 +182,7 @@ int lua_findsymbol (char *s)
  *
  * @param s 目标字符串。
  * @return 符号所在的表索引；出错返回 -1。
+ * @note 增加了对 calloc 后内存是否够用的检查。
  */
 int lua_findconstant (char *s)
 {
@@ -200,6 +201,10 @@ int lua_findconstant (char *s)
  {
   // 分配字符串空间，头部预留 1 个 GC 标记字节，尾部预留 1 个 C 字符串结束符 '\0'
   char *c = calloc(strlen(s)+2,sizeof(char));
+  if (c == NULL) {
+    lua_error("not enough memory");
+    return -1;
+  }
   c++; // 指向第二个空间，将首位留作标记
   lua_constant[lua_nconstant++] = strcpy(c,s); // 将字符串加入常量表结尾，并将字符串常量计数器自增
  }
@@ -220,7 +225,8 @@ void lua_travsymbol (void (*fn)(Object *))
  * @brief 标记对象。
  *
  * 字符串对象 将预留标记位设置为 1。
- * 数组对象 调用 lua_hashmark() 进行标记
+ * 数组对象 调用 lua_hashmark() 进行标记。
+ * 
  * @param o 需要被标记的对象。
  */
 void lua_markobject (Object *o)
