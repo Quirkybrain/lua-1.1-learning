@@ -9,7 +9,7 @@ LIB= ../../lib
 
 CC= gcc
 # CFLAGS= -g -Wall -O2 -I$(INC)
-CFLAGS= -g -Wall -O2 -fPIC -I$(INC)
+CFLAGS= -g -Wall -O0 -fPIC -I$(INC)
 
 OBJS= lua.o
 T=$(BIN)/lua

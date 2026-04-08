@@ -41,6 +41,7 @@ char *lua_lasttext (void)
 ^"$nodebug"				{yylval.vInt = 0; return DEBUG;}
 \n					lua_linenumber++;
 "--".*					;
+"//".*					;
 "local"					return LOCAL;
 "if"					return IF;
 "then"					return THEN;

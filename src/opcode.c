@@ -832,7 +832,7 @@ int lua_dofile (char *filename)
  * @brief 执行 lua 脚本字符串。
  *
  * 将给定的字符串作为 lua 代码，解析并执行全局代码，
- * 执行结束后自动关闭文件。
+ * 执行结束后自动关闭字符串源头。
  *
  * @param string 脚本字符串。
  * @return 执行成功则返回 0；执行失败则返回错误码 1。

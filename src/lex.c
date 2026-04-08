@@ -165,6 +165,15 @@ int yylex ()
         do { next(); } while (current != '\n' && current != 0);
         continue;
 
+      // lua 语言注释和除法运算
+      case '/':
+        save_and_next();
+        // 判断是否为两个连续的 '/' 字符
+        if (current != '/') return '/';
+        do { next(); } while (current != '\n' && current != 0);
+        continue;
+
+
       // <= 小于等于
       case '<':
         save_and_next();

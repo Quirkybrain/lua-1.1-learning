@@ -9,6 +9,7 @@
 typedef void (*lua_CFunction) (void);
 typedef struct Object *lua_Object;
 
+// 注册 cfunction 的宏
 #define lua_register(n,f)	(lua_pushcfunction(f), lua_storeglobal(n))
 
 
